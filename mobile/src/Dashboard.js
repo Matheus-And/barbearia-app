@@ -33,15 +33,14 @@ export default function Dashboard({ navigation }) {
     if (storedRole) {
       setRole(storedRole);
       
-      // Definição da tela inicial por Role
       if (storedRole === 'admin' || storedRole === 'barber') {
         setView('listar');
+        fetchAppointments(storedRole);
       } else {
-        setView('agendar'); // User começa agendando
+        setView('agendar');
+        fetchAppointments(storedRole);
         fetchUserProfile();
       }
-      
-      fetchAppointments(storedRole);
     } else {
       handleLogout();
     }
@@ -49,18 +48,15 @@ export default function Dashboard({ navigation }) {
 
   const fetchAppointments = async (currentRole) => {
     try {
-      let url = '/appointments/my-appointments'; 
-      
+      let url = '/appointments/my-appointments';
       if (currentRole === 'admin') url = '/appointments/all';
-      if (currentRole === 'barber') url = '/appointments/barber-schedule'; 
+      if (currentRole === 'barber') url = '/appointments/barber-schedule';
       
       const res = await api.get(url);
       setAppointments(res.data);
-    } catch (err) {
-      console.log(err);
+    } catch {
     }
   };
-
 
   const fetchUserProfile = async () => {
     try {
@@ -68,7 +64,9 @@ export default function Dashboard({ navigation }) {
       setProfileName(res.data.name);
       setProfileEmail(res.data.email);
       setProfileContact(res.data.contact || '');
-    } catch (err) { console.log(err); }
+    } catch {
+
+    }
   };
 
   const handleContactChange = (text) => {
@@ -84,9 +82,9 @@ export default function Dashboard({ navigation }) {
     try {
       await api.put('/auth/update', { name: profileName, contact: profileContact });
       Alert.alert('Sucesso', 'Dados atualizados!');
-} catch { 
-            Alert.alert('Erro', 'Não foi possível excluir.');
-          }
+    } catch {
+      Alert.alert('Erro', 'Não foi possível atualizar.');
+    }
   };
 
   const onChangeDate = (event, selectedDate) => {
@@ -136,13 +134,18 @@ export default function Dashboard({ navigation }) {
       const dateString = formatDateBackend(date);
       const timeString = formatTimeBackend(time);
       const appointmentDate = new Date(`${dateString}T${timeString}:00`);
+      
       await api.post('/appointments', { barber, date: appointmentDate });
       Alert.alert('Sucesso', 'Agendamento Confirmado!');
       fetchAppointments(role);
       setView('listar');
     } catch (err) {
-      console.log(err);
-      Alert.alert('Erro', 'Falha ao agendar.');
+      if (err.response && err.response.status === 401) {
+        Alert.alert('Sessão Expirada', 'Faça login novamente.');
+        handleLogout();
+      } else {
+        Alert.alert('Erro', 'Falha ao agendar.');
+      }
     }
   };
 
@@ -153,7 +156,7 @@ export default function Dashboard({ navigation }) {
           try {
             await api.delete(`/appointments/${id}`);
             fetchAppointments(role);
-            } catch { 
+          } catch {
             Alert.alert('Erro', 'Não foi possível excluir.');
           }
         }
@@ -168,15 +171,10 @@ export default function Dashboard({ navigation }) {
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      
-      {/* LÓGICA DE EXIBIÇÃO DOS DADOS DO CARD */}
-      
-      {/* 1. BARBEIRO: Se for Admin ou User, mostra o nome do Barbeiro. Se for Barbeiro, esconde. */}
       {role !== 'barber' && (
         <Text style={styles.cardText}><Text style={styles.bold}>Barbeiro:</Text> {item.barber}</Text>
       )}
 
-      {/* 2. CLIENTE: Se for Admin ou Barbeiro, mostra o nome do Cliente e Telefone */}
       {(role === 'admin' || role === 'barber') && (
         <>
           <Text style={styles.cardText}><Text style={styles.bold}>Cliente:</Text> {item.user?.name || '---'}</Text>
@@ -204,7 +202,6 @@ export default function Dashboard({ navigation }) {
       </View>
 
       <View style={styles.tabs}>
-        {/* CLIENTE */}
         {role === 'user' && (
           <>
             <TouchableOpacity onPress={() => setView('agendar')} style={[styles.tab, view === 'agendar' && styles.activeTab]}>
@@ -219,14 +216,12 @@ export default function Dashboard({ navigation }) {
           </>
         )}
 
-        {/* ADMIN */}
         {role === 'admin' && (
           <TouchableOpacity onPress={() => setView('listar')} style={[styles.tab, styles.activeTab, { flex: 1 }]}>
-            <Text style={styles.tabText}>Agenda Completa (Todos)</Text>
+            <Text style={styles.tabText}>Todos Agendamentos</Text>
           </TouchableOpacity>
         )}
 
-        {/* BARBEIRO */}
         {role === 'barber' && (
           <TouchableOpacity onPress={() => setView('listar')} style={[styles.tab, styles.activeTab, { flex: 1 }]}>
             <Text style={styles.tabText}>Meus Clientes</Text>
